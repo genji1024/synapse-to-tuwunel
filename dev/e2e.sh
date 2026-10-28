@@ -12,7 +12,25 @@ here=$(dirname "$(realpath "$0")")
 mkdir -p "$work"
 cd "$work"
 
-step() { printf '\n== %s\n' "$*"; }
+step() {
+	printf '\n== %s\n' "$*"
+	# On GitHub, also an annotation: the log itself cannot be read there.
+	[ -z "${GITHUB_ACTIONS:-}" ] || echo "::notice::e2e: $*"
+}
+
+# wait_for URL PID LOG: until URL answers, giving up after two minutes or
+# when the process is gone.
+wait_for() {
+	i=0
+	until curl -sf "$1" >/dev/null; do
+		if ! kill -0 "$2" 2>/dev/null || [ $((i += 1)) -gt 120 ]; then
+			echo "$1 did not answer; the end of $3:"
+			tail -n 50 "$3"
+			exit 1
+		fi
+		sleep 1
+	done
+}
 
 step "Synapse"
 psql -U postgres -c "CREATE USER synapse PASSWORD 'synapse'"
@@ -43,15 +61,15 @@ yaml.safe_dump(c, open(path, "w"))
 PY
 venv/bin/python -m synapse.app.homeserver -c synapse/homeserver.yaml > synapse.log 2>&1 &
 synapse=$!
-until curl -sf http://127.0.0.1:18008/health >/dev/null; do sleep 1; done
+wait_for http://127.0.0.1:18008/health "$synapse" synapse.log
 secret=$(venv/bin/python -c 'import sys,yaml;print(yaml.safe_load(open(sys.argv[1]))["registration_shared_secret"])' synapse/homeserver.yaml)
-python3 "$here/seed.py" http://127.0.0.1:18008 "$secret" seed.json
+timeout 600 python3 "$here/seed.py" http://127.0.0.1:18008 "$secret" seed.json
 kill "$synapse"
 wait "$synapse" || true
 
 step "Export"
 rm -rf export
-venv/bin/python "$here/../exporter/export.py" synapse/homeserver.yaml export
+timeout 600 venv/bin/python "$here/../exporter/export.py" synapse/homeserver.yaml export
 
 step "Import"
 cat > tuwunel.toml <<TOML
@@ -64,15 +82,12 @@ allow_federation = false
 allow_registration = false
 new_user_displayname_suffix = ""
 TOML
-"$importer" keypair tuwunel.toml export
-"$importer" import tuwunel.toml export passwords.tsv
+timeout 600 "$importer" keypair tuwunel.toml export
+timeout 600 "$importer" import tuwunel.toml export passwords.tsv
 
 step "Tuwunel"
 TUWUNEL_CONFIG=tuwunel.toml "$tuwunel" > tuwunel.log 2>&1 &
 server=$!
-until curl -sf http://127.0.0.1:18448/_matrix/client/versions >/dev/null; do
-	kill -0 "$server" || { cat tuwunel.log; exit 1; }
-	sleep 1
-done
-python3 "$here/check.py" http://127.0.0.1:18448 seed.json passwords.tsv export
+wait_for http://127.0.0.1:18448/_matrix/client/versions "$server" tuwunel.log
+timeout 600 python3 "$here/check.py" http://127.0.0.1:18448 seed.json passwords.tsv export
 kill "$server"

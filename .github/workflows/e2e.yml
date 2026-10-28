@@ -12,6 +12,7 @@ jobs:
     # GitHub, where the repository is mirrored.
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:16
@@ -51,8 +52,18 @@ jobs:
           zstd -d tuwunel.zst -o tuwunel
           chmod +x tuwunel
       - name: Migrate and check
-        run: dev/e2e.sh "$RUNNER_TEMP/e2e" target/debug/synapse-to-tuwunel ./tuwunel
+        timeout-minutes: 30
+        run: |
+          set -o pipefail
+          dev/e2e.sh "$RUNNER_TEMP/e2e" target/debug/synapse-to-tuwunel ./tuwunel 2>&1 |
+            tee "$RUNNER_TEMP/e2e.log"
       - name: Logs
         if: always()
         run: |
-          for f in "$RUNNER_TEMP"/e2e/*.log; do echo "== $f"; tail -n 100 "$f"; done
+          # The end of each log, as an annotation too.
+          for f in "$RUNNER_TEMP"/e2e.log "$RUNNER_TEMP"/e2e/*.log; do
+            [ -f "$f" ] || continue
+            echo "== $f"; tail -n 100 "$f"
+            tail -n 30 "$f" | sed 's/%/%25/g' | awk -v f="$(basename "$f")" \
+              '{ s = s "%0A" $0 } END { print "::warning title=" f "::" s }'
+          done
