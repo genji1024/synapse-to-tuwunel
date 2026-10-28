@@ -119,6 +119,9 @@ async fn import(config: &str, dir: &Path, passwords_out: &Path) -> Result {
 	}
 	println!("imported {} users", export.manifest.counts.get("users.jsonl").unwrap_or(&0));
 
+	// The services' workers run until the server stops, as when Tuwunel itself
+	// shuts down.
+	services.server.shutdown()?;
 	services.stop().await;
 	Ok(())
 }
