@@ -78,7 +78,9 @@ server_name = "s2t.test"
 database_path = "$work/tuwunel-db"
 address = ["127.0.0.1"]
 port = 18448
-allow_federation = false
+# The check reads the signing key from the federation key endpoint; it
+# listens on 127.0.0.1 only, so nothing federates.
+allow_federation = true
 allow_registration = false
 new_user_displayname_suffix = ""
 TOML
