@@ -28,8 +28,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          # The first build takes long; keep what it compiled even when the
+          # importer itself does not compile yet.
+          cache-on-failure: true
       - name: Build the importer
-        run: cargo build
+        # Compiler errors also become annotations, readable through the API
+        # without downloading the log.
+        run: |
+          set -o pipefail
+          cargo build --message-format=short 2>&1 | tee build.log || {
+            grep -E '^[^ ]+:[0-9]+:[0-9]+: error' build.log | head -n 40 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          }
       - name: Download Tuwunel
         run: |
           name="$TUWUNEL_VERSION-release-all-x86_64-v1-linux-gnu-tuwunel.zst"
