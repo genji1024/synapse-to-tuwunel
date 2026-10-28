@@ -1,0 +1,3 @@
+[env]
+# Tuwunel builds with this set; its code assumes exhaustive ruma types.
+RUMA_UNSTABLE_EXHAUSTIVE_TYPES = "true"

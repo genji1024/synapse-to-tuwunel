@@ -1,0 +1,16 @@
+[package]
+name = "synapse-to-tuwunel"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Import a Synapse export into a new Tuwunel database"
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
+# Same exact version as Tuwunel: Logging holds a tracing subscriber.
+tracing = "=0.1.43"
+tuwunel_core.workspace = true
+tuwunel_service.workspace = true

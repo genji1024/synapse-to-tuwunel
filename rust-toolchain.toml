@@ -1,0 +1,4 @@
+[toolchain]
+# Match the Tuwunel release we build against.
+channel = "1.95.0"
+profile = "minimal"
