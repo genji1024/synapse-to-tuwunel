@@ -7,6 +7,8 @@ description = "Import a Synapse export into a new Tuwunel database"
 
 [dependencies]
 base64 = "0.22"
+# Tuwunel's err!/Err! macros call ::const_str; same version and features.
+const-str = { version = "1.1", features = ["proc"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
